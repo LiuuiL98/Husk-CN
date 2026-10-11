@@ -1,0 +1,54 @@
+name: Build Husk CN IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/simplified-chinese
+    paths:
+      - 'src/app/Husk/Resources/zh-Hans.lproj/**'
+      - '.github/workflows/build-husk-cn.yml'
+      - 'src/app/**'
+      - 'scripts/**'
+      - 'patches/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: husk-cn-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Husk requires Apple's Xcode/iOS SDK, so this must run on a macOS runner.
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: feature/simplified-chinese
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install autoconf automake libtool meson ninja pkg-config gettext xcodegen cmake rust
+          rustup target add aarch64-apple-ios
+
+      - name: Build IPA and TrollStore TIPA
+        shell: bash
+        run: |
+          set -o pipefail
+          ./scripts/ci_build.sh "$RUNNER_TEMP/Husk-CN.ipa"
+
+      - name: Upload IPA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Husk-CN-iOS-build
+          path: |
+            ${{ runner.temp }}/Husk-CN.ipa
+            ${{ runner.temp }}/Husk-CN.tipa
+          if-no-files-found: error
+          retention-days: 14
